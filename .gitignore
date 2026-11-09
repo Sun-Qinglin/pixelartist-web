@@ -26,3 +26,7 @@ build/
 *.gif
 *.png
 !public/downloads/*.exe
+
+# public/ 目录整库放行(网站静态资源、安装包、favicon 等都要提交)
+!public/
+!public/**
