@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { createClient, type User } from "@supabase/supabase-js";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+// 环境变量在部署平台粘贴时容易混入引号、反引号或空白,先清洗再使用。
+const clean = (v?: string) => (v ?? "").replace(/[`"'\s]/g, "");
+
+const url = clean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const anonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) || clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 const CONFIGURED = Boolean(url && anonKey);
 const supabase = CONFIGURED ? createClient(url, anonKey) : null;
 
