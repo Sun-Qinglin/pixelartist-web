@@ -6,7 +6,7 @@ export const release = {
   channel: "公开测试",
   platform: "Windows 10 / 11 · 64 位",
   size: "64.18 MB",
-  sha256: "8e5ace672f897ab2dc9045490f73df837ebab0328f53272be14e5e944a8e6fb1",
+  sha256: "135b0071e7986770f05385b4a38b834e49a8fd1ec1e4ec85c71e415b02a3e1d7",
   /** false 时下载按钮显示"准备中";安装包放到 public/downloads/ 后改成 true */
   downloadReady: true,
   downloadPath: "/downloads/PixelArtist-0.1.0.exe",
