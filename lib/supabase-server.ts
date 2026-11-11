@@ -4,24 +4,25 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+// 部署平台粘贴环境变量时容易混入引号、反引号或空白,先清洗再使用。
+const clean = (v?: string) => (v ?? "").replace(/[`"'\s]/g, "");
+
 function _serverKey() {
   return (
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    ""
+    clean(process.env.SUPABASE_SECRET_KEY) ||
+    clean(process.env.SUPABASE_SERVICE_ROLE_KEY)
   );
 }
 function _publicKey() {
   return (
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    ""
+    clean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ||
+    clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   );
 }
 
 // 服务端 client (secret / service_role, 绕过 RLS)
 export function getSupabaseServer() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = clean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const key = _serverKey();
   if (!url || !key) return null;
   return createClient(url, key, {
@@ -31,7 +32,7 @@ export function getSupabaseServer() {
 
 // 带用户登录态的 client (从 cookie 里提取 access_token)
 export function getSupabaseWithUser(accessToken: string | null | undefined) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = clean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const pubKey = _publicKey();
   if (!url || !pubKey || !accessToken) return null;
   return createClient(url, pubKey, {
