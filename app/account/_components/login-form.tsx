@@ -9,7 +9,13 @@ const clean = (v?: string) => (v ?? "").replace(/[`"'\s]/g, "");
 const url = clean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const anonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) || clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 const CONFIGURED = Boolean(url && anonKey);
-const supabase = CONFIGURED ? createClient(url, anonKey) : null;
+const supabase = CONFIGURED ? createClient(url, anonKey, {
+  auth: {
+    persistSession: true,
+    detectSessionInUrl: false,  // 禁用自动检测, 全靠 useEffect 里手动 exchangeCodeForSession 处理, 避免竞争
+    autoRefreshToken: true,
+  },
+}) : null;
 
 type Profile = {
   pro_tier: string;
@@ -56,15 +62,54 @@ export default function LoginForm() {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+
+    // 显式处理 magic link 跳转: URL 里带 ?ticket=xxx&type=xxx
+    // Supabase SDK 自动 detectSessionInUrl 默认开启,但这里加显式调用 + 日志方便排查
+    const params = new URLSearchParams(window.location.search);
+    const ticket = params.get("ticket");
+    const type = params.get("type");
+    const errorDesc = params.get("error_description");
+
+    if (errorDesc) {
+      setError(decodeURIComponent(errorDesc));
+      console.warn("[auth] Supabase 回调错误:", errorDesc);
+    }
+
+    if (ticket) {
+      console.log("[auth] 检测到 magic link ticket,开始交换 session, type=", type);
+      supabase.auth.exchangeCodeForSession(ticket).then(({ data, error }) => {
+        if (error) {
+          console.error("[auth] exchangeCodeForSession 失败:", error);
+          setError("登录链接已失效或服务器拒绝: " + error.message);
+        } else {
+          console.log("[auth] exchangeCodeForSession 成功, user:", data.session?.user?.email);
+          // 交换完成后清掉 URL 里的 ticket,防止刷新时重复交换
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete("ticket");
+          cleanUrl.searchParams.delete("type");
+          window.history.replaceState({}, "", cleanUrl.toString());
+          setUser(data.session?.user ?? null);
+          setTimeout(fetchMe, 150);
+        }
+      }).catch((err) => {
+        console.error("[auth] exchangeCodeForSession 异常:", err);
+        setError("登录流程异常,请刷新重试");
+      });
+      return; // ticket 交换完再走后续订阅,避免状态竞争
+    }
+
+    // 常规路径: 已有 session 就同步 + 订阅变化
+    supabase.auth.getUser().then(({ data }) => {
+      console.log("[auth] 初始 getUser:", data.user ? data.user.email : "无用户");
+      setUser(data.user);
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[auth] onAuthStateChange:", event, session?.user?.email ?? "");
       setUser(session?.user ?? null);
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-        // 登录/登出后刷新 profile
         setTimeout(fetchMe, 100);
       }
     });
-    // 初始化拿一下
     setTimeout(fetchMe, 100);
     return () => sub.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
